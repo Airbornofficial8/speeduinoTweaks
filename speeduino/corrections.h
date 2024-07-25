@@ -15,6 +15,7 @@ byte correctionASE(void); //After Start Enrichment
 uint16_t correctionAccel(void); //Acceleration Enrichment
 byte correctionFloodClear(void); //Check for flood clear on cranking
 byte correctionAFRClosedLoop(void); //Closed loop AFR adjustment
+byte correctionAFRLongTermFuelTrim(void); //Closed loop Long Term Fuel Trimming
 byte correctionFlex(void); //Flex fuel adjustment
 byte correctionFuelTemp(void); //Fuel temp correction
 byte correctionBatVoltage(void); //Battery voltage correction
@@ -52,5 +53,6 @@ extern uint8_t dfcoDelay;
 extern uint8_t idleAdvTaper;
 extern uint8_t crankingEnrichTaper;
 extern uint8_t dfcoTaper;
+extern uint8_t lastSTFTError;
 
 #endif // CORRECTIONS_H

@@ -30,6 +30,7 @@ There are 2 top level functions that call more detailed corrections for Fuel and
 #include "maths.h"
 #include "sensors.h"
 #include "src/PID_v1/PID_v1.h"
+#include <EEPROM.h> //Include the Arduino EEPROM lib, to avoid issues the EEPROM is directly interfaced to by the LTFT function.
 
 long PID_O2, PID_output, PID_AFRTarget;
 /** Instance of the PID object in case that algorithm is used (Always instantiated).
@@ -52,11 +53,27 @@ uint8_t dfcoDelay;
 uint8_t idleAdvTaper;
 uint8_t crankingEnrichTaper;
 uint8_t dfcoTaper;
+uint8_t lastSTFTError;
+uint8_t InitialLTFT;
 
 /** Initialise instances and vars related to corrections (at ECU boot-up).
  */
 void initialiseCorrections(void)
 {
+  //This is a sanity check hack, to avoid a speeduino that has never written to 3457 in the EEPROM before from using 255 as a correction value. At bootup the Speeduino will clamp LTFT to within + or - 20%
+  InitialLTFT = EEPROM.read(3457);
+  if (InitialLTFT > 120)
+  {
+    InitialLTFT = 120;
+    EEPROM.write(3457, InitialLTFT);
+  }
+  else if(InitialLTFT < 80)
+  {
+    InitialLTFT = 80;
+    EEPROM.write(3457, InitialLTFT);
+  }
+  //Sanity Check Hack Logic ends
+
   egoPID.SetMode(AUTOMATIC); //Turn O2 PID on
   currentStatus.flexIgnCorrection = 0;
   currentStatus.egoCorrection = 100; //Default value of no adjustment must be set to avoid randomness on first correction cycle after startup
@@ -99,6 +116,9 @@ uint16_t correctionsFuel(void)
 
   currentStatus.egoCorrection = correctionAFRClosedLoop();
   if (currentStatus.egoCorrection != 100) { sumCorrections = div100(sumCorrections * currentStatus.egoCorrection); }
+
+  currentStatus.LTFTCorrection = correctionAFRLongTermFuelTrim();
+  if (currentStatus.LTFTCorrection !=100) {sumCorrections = div100(sumCorrections * currentStatus.LTFTCorrection); }
 
   currentStatus.batCorrection = correctionBatVoltage();
   if (configPage2.battVCorMode == BATTV_COR_MODE_OPENTIME)
@@ -667,9 +687,51 @@ byte correctionAFRClosedLoop(void)
       else { AFRValue = 100; } // If multivariable check fails disable correction
     } //Ignition count check
   } //egoType
-
-  return AFRValue; //Catch all (Includes when AFR target = current AFR
+  lastSTFTError = AFRValue;
+  return AFRValue; //Catch all (Includes when AFR target = current AFR)
 }
+
+byte correctionAFRLongTermFuelTrim(void)
+{
+    byte LTFT = 100; //Set an initial value for LTFT of 100, this is so if LTFT is disabled the return value is 100.
+
+    if (configPage6.egoType > 0) //Check if the o2 logic is turned off, if its off we see if LTFT needs to be updated.
+    {
+        if (lastSTFTError > 103 || lastSTFTError < 97) //Do the initial check to see if LTFT should be updated because STFT is excessivly trimming. We saved this value from the last run of the STFT logic
+        {
+            //Here, the same condtional check as the STFT system runs to make sure we are within the operating range of the o2 sensor. If this check fails we return as STFT and LTFT should not be running, the engine should be "Open Loop".
+            if ((currentStatus.coolant > (int)(configPage6.egoTemp - CALIBRATION_TEMPERATURE_OFFSET)) && (currentStatus.RPM > (unsigned int)(configPage6.egoRPM * 100)) && (currentStatus.TPS <= configPage6.egoTPSMax) && (currentStatus.O2 < configPage6.ego_max) && (currentStatus.O2 > configPage6.ego_min) && (currentStatus.runSecs > configPage6.ego_sdelay) && (BIT_CHECK(currentStatus.status1, BIT_STATUS1_DFCO) == 0) && (currentStatus.MAP <= (configPage9.egoMAPMax * 2)) && (currentStatus.MAP >= (configPage9.egoMAPMin * 2)))
+            {
+              //If we made it here, The O2 sensor is active and within ranges and the LTFT needs to be updated.
+              LTFT = EEPROM.read(3457); //First, get the current LTFT value, we can then add to it and write the updated value.
+              if(lastSTFTError > 103)
+              {
+                LTFT = LTFT + 1;
+                EEPROM.write(3457, LTFT);
+                return LTFT;  //Determined the Error is positive, LTFT will learn upwards, Write the change to the prom and return the new value as a correction
+              }
+              else if(lastSTFTError < 97)
+              {
+                LTFT = LTFT - 1;
+                EEPROM.write(3457, LTFT);
+                return LTFT; //Determined the Error is negative, LTFT will learn downwards, Write the change to the prom and return the new value as a correction
+              }
+            }
+            else
+            {
+                return LTFT; //The o2 sensor is out of operation range and the engine should be "Open Loop". Return a 1.00 fuel multiplier.
+            }
+        }
+        else
+        {
+            LTFT = EEPROM.read(3457);
+            return LTFT; //If we made it here, STFT isn't over trimming and we shoud just read the current value to apply for this RPM and Load and apply it
+        }
+        return LTFT;
+    }
+    return LTFT; //We made it here if the o2 sensor was disabled, in which case the LTFT system also returns 100 just like the STFT system.
+}
+
 
 //******************************** IGNITION ADVANCE CORRECTIONS ********************************
 /** Dispatch calculations for all ignition related corrections.

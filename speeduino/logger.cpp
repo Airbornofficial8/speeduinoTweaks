@@ -17,7 +17,7 @@
  * @param byteNum - byte-Field number. This is not the entry number (As some entries have multiple byets), but the byte number that is needed
  * @return Field value in 1 byte size struct fields or 1 byte partial value (chunk) on multibyte fields.
  */
-byte getTSLogEntry(uint16_t byteNum)
+byte getTSLogEntry(uint16_t byteNum) //Rob - Added LTFT correction here at bit pos 130. I think my current copy of the INI is out of date vs the current one for this firmware.
 {
   byte statusValue = 0;
 
@@ -177,6 +177,7 @@ byte getTSLogEntry(uint16_t byteNum)
     case 127: statusValue = currentStatus.status5; break;
     case 128: statusValue = currentStatus.knockCount; break;
     case 129: statusValue = currentStatus.knockRetard; break;
+    case 130: statusValue = currentStatus.LTFTCorrection; break;
     default: statusValue = 0; // MISRA check
   }
 

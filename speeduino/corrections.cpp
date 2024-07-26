@@ -56,24 +56,35 @@ uint8_t dfcoTaper;
 uint8_t lastSTFTError;
 uint8_t InitialLTFT;
 
+//Long Term Fuel Trimming Constants. Some will hopefully be replaced by editable values in tunerstudio, I.e Table Min and Max RPM, etc.
+const uint16_t promBaseAddress = 3457; //Declare the base address the LTFT table structure is stored.
+
+const int tableLowRPM = 1000; //The RPM for the first column of the LTFT table in memory. Below this rpm, LTFT will just refrence data from the first column
+const int tableHighRPM = 6000; //The RPM for the last column of the LTFT table in memory. Above this rpm, LTFT will just refrence data from the last column
+
+const int tableLowMAP = 20; //The RPM for the first row of the LTFT table in memory. Below this MAP, LTFT will just refrence data from the first row
+const int tableHighMAP = 200; //The RPM for the last row of the LTFT table in memory. Above this MAP, LTFT will just refrence data from the last row
+
 /** Initialise instances and vars related to corrections (at ECU boot-up).
  */
 void initialiseCorrections(void)
 {
-  //This is a sanity check hack, to avoid a speeduino that has never written to 3457 in the EEPROM before from using 255 as a correction value. At bootup the Speeduino will clamp LTFT to within + or - 20%
-  InitialLTFT = EEPROM.read(3457);
-  if (InitialLTFT > 120)
+  //This is a sanity check hack, to avoid a speeduino that has never written to the LTFT table area in the EEPROM before from using 255 as a correction value. At bootup, check the valid byte @ 3522, if its anything but 1, declare invalid and write 100s to the table
+  byte LTFTValidByte = EEPROM.read(3522);
+  if (LTFTValidByte != 1)
   {
-    InitialLTFT = 120;
-    EEPROM.write(3457, InitialLTFT);
-  }
-  else if(InitialLTFT < 80)
-  {
-    InitialLTFT = 80;
-    EEPROM.write(3457, InitialLTFT);
+    int bytesToClear;
+    int currentAddr;
+    currentAddr = promBaseAddress;
+    for(bytesToClear = 64; bytesToClear > 0; bytesToClear - 1)
+    {
+      EEPROM.write(currentAddr, 100);
+      currentAddr++;
+    }
+    EEPROM.write(3522, 1);
   }
   //Sanity Check Hack Logic ends
-
+  
   egoPID.SetMode(AUTOMATIC); //Turn O2 PID on
   currentStatus.flexIgnCorrection = 0;
   currentStatus.egoCorrection = 100; //Default value of no adjustment must be set to avoid randomness on first correction cycle after startup
@@ -703,19 +714,41 @@ byte correctionAFRLongTermFuelTrim(void)
             if ((currentStatus.coolant > (int)(configPage6.egoTemp - CALIBRATION_TEMPERATURE_OFFSET)) && (currentStatus.RPM > (unsigned int)(configPage6.egoRPM * 100)) && (currentStatus.TPS <= configPage6.egoTPSMax) && (currentStatus.O2 < configPage6.ego_max) && (currentStatus.O2 > configPage6.ego_min) && (currentStatus.runSecs > configPage6.ego_sdelay) && (BIT_CHECK(currentStatus.status1, BIT_STATUS1_DFCO) == 0) && (currentStatus.MAP <= (configPage9.egoMAPMax * 2)) && (currentStatus.MAP >= (configPage9.egoMAPMin * 2)))
             {
               //If we made it here, The O2 sensor is active and within ranges and the LTFT needs to be updated.
-              LTFT = EEPROM.read(3457); //First, get the current LTFT value, we can then add to it and write the updated value.
-              if(lastSTFTError > 103)
+              //First we make the required calculations to scale our own table structure.
+              byte scaledRPM = map((int)currentStatus.RPM, tableLowRPM, tableHighRPM, 0, 8); //Use arduino map logic to map the current RPM to an int table scaling value that indicates what col to lookup. We force this to be an int.
+              byte scaledMAP = map((int)currentStatus.MAP, tableLowMAP, tableHighMAP, 0, 8); //Use arduino map logic to map the current Manifold Pressure to an int table scaling value that indicates what col to lookup. We force this to be an int.
+
+              if (scaledRPM > 8); //Memory Safe Checks, prevents scaling beyond 8 Rows or Cols
+              {
+                scaledRPM = 8;
+              }
+              if (scaledMAP > 8);
+              {
+                scaledMAP = 8;
+              }
+              byte rpmCol = scaledRPM;
+              byte mapRow = 8 * scaledMAP; //Setup the actual base address adders which determine the read location
+
+              //Second, we use these values to decide the actual prom address to read
+              word addrToRead = promBaseAddress;
+              addrToRead + scaledRPM;
+              addrToRead + scaledMAP;
+
+              //Finally, we read the PROM at the calculated address
+              LTFT = EEPROM.read(addrToRead);
+
+              //Now we apply the correction value to the table
+              if (lastSTFTError > 103)
               {
                 LTFT = LTFT + 1;
-                EEPROM.write(3457, LTFT);
-                return LTFT;  //Determined the Error is positive, LTFT will learn upwards, Write the change to the prom and return the new value as a correction
+                EEPROM.write(addrToRead, LTFT);
               }
-              else if(lastSTFTError < 97)
+              else if (lastSTFTError < 97)
               {
                 LTFT = LTFT - 1;
-                EEPROM.write(3457, LTFT);
-                return LTFT; //Determined the Error is negative, LTFT will learn downwards, Write the change to the prom and return the new value as a correction
+                EEPROM.write(addrToRead, LTFT);
               }
+              return LTFT; //We have updated our record of LTFT and can now return the new updated value as a fueling correction
             }
             else
             {
@@ -724,10 +757,31 @@ byte correctionAFRLongTermFuelTrim(void)
         }
         else
         {
-            LTFT = EEPROM.read(3457);
-            return LTFT; //If we made it here, STFT isn't over trimming and we shoud just read the current value to apply for this RPM and Load and apply it
+          //Else statement means STFT is inside the acceptable band and LTFT has no need to increase or decrease its own correction. We just read the current correction from the table and return it.
+          //First we make the required calculations to scale our own table structure.
+          byte scaledRPM = map((int)currentStatus.RPM, tableLowRPM, tableHighRPM, 0, 8); //Use arduino map logic to map the current RPM to an int table scaling value that indicates what col to lookup. We force this to be an int.
+          byte scaledMAP = map((int)currentStatus.MAP, tableLowMAP, tableHighMAP, 0, 8); //Use arduino map logic to map the current Manifold Pressure to an int table scaling value that indicates what col to lookup. We force this to be an int.
+
+          if (scaledRPM > 8); //Memory Safe Checks, prevents scaling beyond 8 Rows or Cols
+          {
+            scaledRPM = 8;
+          }
+          if (scaledMAP > 8);
+          {
+            scaledMAP = 8;
+          }
+          byte rpmCol = scaledRPM;
+          byte mapRow = 8 * scaledMAP; //Setup the actual base address adders which determine the read location
+
+          //Second, we use these values to decide the actual prom address to read
+          word addrToRead = promBaseAddress;
+          addrToRead + scaledRPM;
+          addrToRead + scaledMAP;
+
+          //Finally, we read the PROM at the calculated address
+          LTFT = EEPROM.read(addrToRead);
         }
-        return LTFT;
+        return LTFT; //If we made it here, STFT isn't over trimming and we shoud just read the current value to apply for this RPM and Load and apply it
     }
     return LTFT; //We made it here if the o2 sensor was disabled, in which case the LTFT system also returns 100 just like the STFT system.
 }

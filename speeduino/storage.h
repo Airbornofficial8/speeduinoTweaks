@@ -104,7 +104,9 @@
  * | 3283       |1           | boostControlEnableThreshold          |                                    |
  * | 3284       |14          | A/C Control Settings                 |                                    |
  * | 3298       |159         | Page 15 spare                        |                                    |
- * | 3457       |217         | EMPTY                                |                                    |
+ * | 3457       |64          | Direct LTFT Memory Area              | Long Term Fuel Trim Table Area     |
+ * | 3522       |1           | LTFT Valid Byte                      | Indicates valid LTFT 1 = Valid     |
+ * | 3523       |151         | UNUSED                               |                                    |
  * | 3674       |4           | CLT Calibration CRC32                |                                    |
  * | 3678       |4           | IAT Calibration CRC32                |                                    |
  * | 3682       |4           | O2 Calibration CRC32                 |                                    |

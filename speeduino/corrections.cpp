@@ -76,7 +76,7 @@ void initialiseCorrections(void)
     int bytesToClear;
     int currentAddr;
     currentAddr = promBaseAddress;
-    for(bytesToClear = 64; bytesToClear > 0; bytesToClear - 1)
+    for(bytesToClear = 64; bytesToClear > 0; bytesToClear = bytesToClear - 1)
     {
       EEPROM.write(currentAddr, 100);
       currentAddr++;
@@ -731,8 +731,8 @@ byte correctionAFRLongTermFuelTrim(void)
 
               //Second, we use these values to decide the actual prom address to read
               word addrToRead = promBaseAddress;
-              addrToRead + scaledRPM;
-              addrToRead + scaledMAP;
+              addrToRead = addrToRead + rpmCol;
+              addrToRead = addrToRead + mapRow;
 
               //Finally, we read the PROM at the calculated address
               LTFT = EEPROM.read(addrToRead);
@@ -775,8 +775,8 @@ byte correctionAFRLongTermFuelTrim(void)
 
           //Second, we use these values to decide the actual prom address to read
           word addrToRead = promBaseAddress;
-          addrToRead + scaledRPM;
-          addrToRead + scaledMAP;
+          addrToRead = addrToRead + rpmCol;
+          addrToRead = addrToRead + mapRow;
 
           //Finally, we read the PROM at the calculated address
           LTFT = EEPROM.read(addrToRead);

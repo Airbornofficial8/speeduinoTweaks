@@ -618,7 +618,6 @@ struct statuses {
   uint16_t corrections; /**< The total current corrections % amount */
   uint16_t AEamount;    /**< The amount of acceleration enrichment currently being applied. 100=No change. Varies above 255 */
   byte egoCorrection; /**< The amount of closed loop AFR enrichment currently being applied */
-  byte LTFTCorrection; /**< The amount of closed loop AFR enrichment being applied by the Long Term Trimming Logic */
   byte wueCorrection; /**< The amount of warmup enrichment currently being applied */
   byte batCorrection; /**< The amount of battery voltage enrichment currently being applied */
   byte iatCorrection; /**< The amount of inlet air temperature adjustment currently being applied */
@@ -698,6 +697,7 @@ struct statuses {
   byte outputsStatus;
   byte TS_SD_Status; //TunerStudios SD card status
   byte airConStatus;
+  byte LTFTCorrection; /**< The amount of closed loop AFR enrichment being applied by the Long Term Trimming Logic */
 };
 
 static inline bool HasAnySync(const statuses &status) {

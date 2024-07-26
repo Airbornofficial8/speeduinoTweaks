@@ -335,6 +335,9 @@ static void loadPageValuesToBuffer(uint8_t pageNum, uint16_t offset, byte *buffe
  * @param packetLength - Length of actual message (after possible ack/confirm headers)
  * E.g. tuning sw command 'A' (Send all values) will send data from field number 0, LOG_ENTRY_SIZE fields.
  */
+
+//Rob note, confirmed that this code will allow reporting the additional LTFTCorrection Byte to TunerStudio. This will make it viewable as a gauge on the dashboard and loggable.
+//At this time, I have not yet created a .ini to tell TunerStudio to expect this new value.
 static void generateLiveValues(uint16_t offset, uint16_t packetLength)
 {  
   if(firstCommsRequest) 

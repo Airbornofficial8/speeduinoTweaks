@@ -128,7 +128,7 @@ uint16_t correctionsFuel(void)
   currentStatus.egoCorrection = correctionAFRClosedLoop();
   if (currentStatus.egoCorrection != 100) { sumCorrections = div100(sumCorrections * currentStatus.egoCorrection); }
 
-  currentStatus.LTFTCorrection = correctionAFRLongTermFuelTrim();
+  currentStatus.LTFTCorrection = correctionAFRLongTermFuelTrim(); //Just like all the other corrections, LTFT reports its current correction to Current status, making it fetchable in TunerStudio. The INI will need to be tweaked to interprate it.
   if (currentStatus.LTFTCorrection !=100) {sumCorrections = div100(sumCorrections * currentStatus.LTFTCorrection); }
 
   currentStatus.batCorrection = correctionBatVoltage();

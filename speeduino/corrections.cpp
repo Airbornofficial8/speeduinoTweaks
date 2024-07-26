@@ -715,8 +715,8 @@ byte correctionAFRLongTermFuelTrim(void)
             {
               //If we made it here, The O2 sensor is active and within ranges and the LTFT needs to be updated.
               //First we make the required calculations to scale our own table structure.
-              byte scaledRPM = map((int)currentStatus.RPM, tableLowRPM, tableHighRPM, 0, 8); //Use arduino map logic to map the current RPM to an int table scaling value that indicates what col to lookup. We force this to be an int.
-              byte scaledMAP = map((int)currentStatus.MAP, tableLowMAP, tableHighMAP, 0, 8); //Use arduino map logic to map the current Manifold Pressure to an int table scaling value that indicates what col to lookup. We force this to be an int.
+              byte scaledRPM = map((int)currentStatus.RPM, tableLowRPM, tableHighRPM, 0, 7); //Use arduino map logic to map the current RPM to an int table scaling value that indicates what col to lookup. We force this to be an int.
+              byte scaledMAP = map((int)currentStatus.MAP, tableLowMAP, tableHighMAP, 0, 7); //Use arduino map logic to map the current Manifold Pressure to an int table scaling value that indicates what col to lookup. We force this to be an int.
 
               if (scaledRPM > 8); //Memory Safe Checks, prevents scaling beyond 8 Rows or Cols
               {
@@ -759,8 +759,8 @@ byte correctionAFRLongTermFuelTrim(void)
         {
           //Else statement means STFT is inside the acceptable band and LTFT has no need to increase or decrease its own correction. We just read the current correction from the table and return it.
           //First we make the required calculations to scale our own table structure.
-          byte scaledRPM = map((int)currentStatus.RPM, tableLowRPM, tableHighRPM, 0, 8); //Use arduino map logic to map the current RPM to an int table scaling value that indicates what col to lookup. We force this to be an int.
-          byte scaledMAP = map((int)currentStatus.MAP, tableLowMAP, tableHighMAP, 0, 8); //Use arduino map logic to map the current Manifold Pressure to an int table scaling value that indicates what col to lookup. We force this to be an int.
+          byte scaledRPM = map((int)currentStatus.RPM, tableLowRPM, tableHighRPM, 0, 7); //Use arduino map logic to map the current RPM to an int table scaling value that indicates what col to lookup. We force this to be an int.
+          byte scaledMAP = map((int)currentStatus.MAP, tableLowMAP, tableHighMAP, 0, 7); //Use arduino map logic to map the current Manifold Pressure to an int table scaling value that indicates what col to lookup. We force this to be an int.
 
           if (scaledRPM > 8); //Memory Safe Checks, prevents scaling beyond 8 Rows or Cols
           {
